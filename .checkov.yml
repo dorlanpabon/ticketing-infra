@@ -1,0 +1,9 @@
+framework:
+  - terraform
+  - github_actions
+download-external-modules: false
+skip-path:
+  - .terraform
+  - artifacts
+  - .work
+compact: true

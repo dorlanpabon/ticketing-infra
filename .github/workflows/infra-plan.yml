@@ -1,0 +1,76 @@
+name: Authorized AWS read-only plan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  select-environment:
+    runs-on: ubuntu-24.04
+    outputs:
+      target: ${{ steps.select.outputs.target }}
+    steps:
+      - id: select
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          case "$BRANCH" in
+            develop) echo 'target=dev' >> "$GITHUB_OUTPUT" ;;
+            release) echo 'target=qa' >> "$GITHUB_OUTPUT" ;;
+            main) echo 'target=prod' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'Only develop, release and main may plan their fixed environment.'; exit 1 ;;
+          esac
+
+  plan:
+    needs: select-environment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ${{ needs.select-environment.outputs.target }}-plan
+    concurrency:
+      group: infrastructure-${{ needs.select-environment.outputs.target }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+      TARGET: ${{ needs.select-environment.outputs.target }}
+      TF_VAR_expected_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_assume_role_arn: ${{ vars.AWS_PLAN_ROLE_ARN }}
+      TF_VAR_image_uris: ${{ vars.APPROVED_IMAGE_URIS_JSON }}
+      TF_VAR_callback_urls: ${{ vars.COGNITO_CALLBACK_URLS_JSON }}
+      TF_VAR_logout_urls: ${{ vars.COGNITO_LOGOUT_URLS_JSON }}
+      TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_monthly_budget_usd: ${{ vars.MONTHLY_BUDGET_USD }}
+      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install tools from reviewed protected branch
+        run: |
+          python scripts/install-tools.py
+          python -m pip install --disable-pip-version-check checkov==3.4.5
+      - name: Verify required account inputs
+        run: |
+          [[ "$TF_VAR_expected_account_id" =~ ^[0-9]{12}$ ]]
+          test -n "$STATE_BUCKET"
+          test -n "$TF_VAR_assume_role_arn"
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          mask-aws-account-id: true
+      - name: Generate and scan sensitive plan without applying
+        run: |
+          mkdir -p .work
+          terraform -chdir="infra/envs/$TARGET" init -input=false -lockfile=readonly -backend-config="bucket=$STATE_BUCKET"
+          terraform -chdir="infra/envs/$TARGET" plan -input=false -no-color -out="$GITHUB_WORKSPACE/.work/candidate.tfplan" > .work/plan.txt
+          terraform -chdir="infra/envs/$TARGET" show -json "$GITHUB_WORKSPACE/.work/candidate.tfplan" > .work/plan.json
+          checkov --file .work/plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE/infra/envs/$TARGET" --quiet
+          sha256sum .work/candidate.tfplan > .work/plan.sha256
+          printf 'Plan completed for the exact checkout; no infrastructure was applied. Sensitive plan files are not published.\n' >> "$GITHUB_STEP_SUMMARY"

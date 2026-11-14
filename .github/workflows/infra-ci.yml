@@ -1,0 +1,59 @@
+name: Infrastructure quality per commit
+
+on:
+  pull_request:
+    branches: [develop, release, main]
+  push:
+    branches: [develop, release, main, 'feature/**', 'fix/**', 'chore/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Require independently reviewed policy
+        env:
+          TRUSTED_POLICY_SHA: ${{ vars.TRUSTED_POLICY_SHA }}
+        run: |
+          [[ "$TRUSTED_POLICY_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Set TRUSTED_POLICY_SHA after reviewing the initial policy commit.'; exit 1; }
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ vars.TRUSTED_POLICY_SHA }}
+          path: .trusted
+          persist-credentials: false
+      - name: Install pinned tools
+        run: |
+          python .trusted/scripts/install-tools.py
+          python -m pip install --disable-pip-version-check checkov==3.4.5
+          python .trusted/scripts/test_verify.py
+      - name: Verify every introduced commit and integration result
+        env:
+          BEFORE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          AFTER: ${{ github.event.pull_request.head.sha || github.sha }}
+          INTEGRATION: ${{ github.sha }}
+          APPROVED_POLICY_HASH: ${{ vars.APPROVED_POLICY_HASH }}
+          TF_IN_AUTOMATION: 'true'
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/terraform-provider-cache
+          AWS_EC2_METADATA_DISABLED: 'true'
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          python .trusted/scripts/verify.py --trusted .trusted --before "$BEFORE" --after "$AFTER" --integration "$INTEGRATION" --approved-policy-hash "$APPROVED_POLICY_HASH"
+      - name: Retain per-SHA results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: infrastructure-quality-${{ github.sha }}
+          path: artifacts/quality/*.json
+          retention-days: 14
+          if-no-files-found: error

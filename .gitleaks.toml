@@ -1,0 +1,3 @@
+title = "Ticketing infrastructure secret policy"
+[extend]
+useDefault = true
