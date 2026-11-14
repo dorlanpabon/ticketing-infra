@@ -28,16 +28,17 @@ EventBridge Scheduler envía `SweepExpiredReservations` cada minuto a `inventory
 | APP_ENV / SPRING_PROFILES_ACTIVE | dev/qa/prod y perfil aws. |
 | AWS_REGION / DYNAMODB_TABLE_NAME | Región y tabla del propietario. |
 | INVENTORY_COMMANDS_QUEUE_URL / INVENTORY_EXPIRATIONS_QUEUE_URL / ORDER_EVENTS_QUEUE_URL / CATALOG_EVENTS_QUEUE_URL | URLs derivadas de SQS. Tener una URL no otorga permisos; IAM limita cada rol. |
-| INVENTORY_BASE_URL / CATALOG_BASE_URL | DNS privado Cloud Map, puerto 8080. Solo Orders API/worker→Inventory API tiene permiso de red interno inicial. Los workers no se publican en DNS. |
+| INVENTORY_BASE_URL | DNS privado Cloud Map, puerto 8080. Solo Orders API/worker→Inventory API tiene permiso de red interno inicial. Los workers no se publican en DNS. |
 | AUTH_MODE | trusted-gateway; las identidades locales nunca son aceptadas en AWS. |
-| RESERVATION_MAX_SECONDS | 600; no se relaja por ambiente. |
-| SQS_CONCURRENCY / SQS_WAIT_TIME_SECONDS / SQS_VISIBILITY_TIMEOUT_SECONDS | 16 / 20 / 60. |
-| OUTBOX_POLL_INTERVAL_MS / RECONCILIATION_INTERVAL_MS | 500 / 5000. Expiración no usa un cron local cada segundo. |
+| OUTBOX_POLL_INTERVAL_MS | 500, solo Catalog/Orders. Inventory usa su DispatchBackoff con base 500 ms. |
+| RECONCILIATION_INTERVAL_MS | 5000, solo Orders. El lease/backoff protege las consultas. |
 | MANAGEMENT_* | Readiness habilitado, exposición health/info y sin detalles. |
 | LOGGING_STRUCTURED_FORMAT_CONSOLE | ecs; JSON estructurado en stdout. |
 | JAVA_TOOL_OPTIONS | Máximo heap 65 %, salida ante OOM y temporales en /tmp. |
 
 El contenedor ejecuta con UID/GID 10001, raíz de solo lectura y temporales únicamente en `/tmp`. La imagen incluye `wget`: ECS comprueba `http://127.0.0.1:8080/actuator/health/readiness` en ambos roles. El ALB comprueba adicionalmente readiness de las APIs. Un worker conserva health en 8080 y rechaza rutas `/api` e `/internal`; su security group no tiene reglas de ingreso.
+
+El máximo de reserva de 600 s, long polling de 20 s y visibilidad de 60 s son límites del código/configuración de aplicación alineados con SQS; no se exportan variables que la aplicación ignore. Inventory limita procesamiento a 10 mensajes concurrentes por cola, con dos loops independientes. Catalog/Orders solicitan lotes de hasta 10. La concurrencia total cambia al escalar workers.
 
 ## Identidad y autorización
 
