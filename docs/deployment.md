@@ -68,6 +68,8 @@ El repositorio IaC mantiene `main`, `develop`, `release` y ramas feature/fix/cho
 
 Tras revisar el primer commit completo de política, configurar `TRUSTED_POLICY_SHA` con ese SHA exacto. El pipeline descarga scripts/configuración de ese commit independiente. `APPROVED_POLICY_HASH` solo se establece para un cambio de política revisado; obtenerlo con `python scripts/verify.py --trusted . --print-policy-hash`. Las exclusiones Checkov y los tests Terraform forman parte de esa huella.
 
+La huella de archivos de política normaliza únicamente CRLF a LF para coincidir entre Windows y Git. Los snapshots del candidato conservan los bytes exactos de cada blob; la auditoría no reescribe contenido ni omite archivos.
+
 La auditoría enumera commits intermedios y merges, materializa blobs exactos de Git y verifica también el resultado integrado. No usa el working tree ni `git archive`, que podría omitir archivos mediante `export-ignore`. Nuevas ramas sin base comprobada recorren toda su historia. Cada SHA obtiene su propio resultado; un gate final no reemplaza el análisis de commits previos.
 
 `infra-plan.yml` es manual. Cada environment `<env>-plan` requiere variables `AWS_ACCOUNT_ID`, `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET`, `COGNITO_CALLBACK_URLS_JSON`, `COGNITO_LOGOUT_URLS_JSON`, `ALARM_EMAIL`, `MONTHLY_BUDGET_USD` y `APPROVED_IMAGE_URIS_JSON`; esta última contiene los tres digests del manifiesto aprobado. Ningún workflow hace apply.

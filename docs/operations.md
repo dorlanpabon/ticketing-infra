@@ -23,7 +23,7 @@ Estas métricas son aproximadas; el apagado debe detener el polling, respetar el
 
 1. Consultar edad/volumen de SQS, eventos ECS, errores, antigüedad del outbox y salud de DynamoDB.
 2. Si SQS falla, preservar el outbox. No generar nuevos IDs ni ampliar deadlines.
-3. Corregir permisos, red o imagen del worker afectado; restaurar consumidores con concurrencia limitada sin reiniciar la API. Cada proceso tiene concurrencia SQS inicial 16, multiplicada por su cantidad de tareas.
+3. Corregir permisos, red o imagen del worker afectado; restaurar consumidores con concurrencia limitada sin reiniciar la API. Inventory procesa hasta 10 mensajes por cola en dos loops; Catalog/Orders solicitan lotes de hasta 10. Escalar tareas multiplica la carga potencial sobre sus dependencias.
 4. Verificar que baja el backlog y que duplicados no repiten efectos.
 5. Confirmar que reservas vencidas se rechazan/liberan aunque el mensaje haya llegado tarde.
 
