@@ -60,7 +60,9 @@ def policy_hash(root: Path) -> str:
             name = path.relative_to(root).as_posix()
             protected = name.startswith(PROTECTED) or filename.endswith(".tftest.hcl")
             if protected:
-                content = path.read_bytes()
+                # Git stores LF while an existing Windows checkout may still contain CRLF.
+                # Snapshot bytes stay exact; only this text-policy fingerprint is canonicalized.
+                content = path.read_bytes().replace(b"\r\n", b"\n")
             elif filename.endswith(".tf"):
                 content = "\n".join(line.strip() for line in path.read_text(encoding="utf-8").splitlines() if "checkov:skip=" in line).encode()
                 if not content:

@@ -82,7 +82,7 @@ locals {
   consume = { catalog = ["catalog-events"], orders = ["order-events"], inventory = ["inventory-commands", "inventory-expirations"] }
   publish = { catalog = ["inventory-commands"], orders = ["inventory-commands"], inventory = ["inventory-expirations", "order-events", "catalog-events"] }
   base_app_configuration = {
-    for service in local.contexts : service => {
+    for service in local.contexts : service => merge({
       APP_ENV                                   = var.environment
       SPRING_PROFILES_ACTIVE                    = "aws"
       AWS_REGION                                = var.region
@@ -92,21 +92,16 @@ locals {
       ORDER_EVENTS_QUEUE_URL                    = module.messaging.queues["order-events"].url
       CATALOG_EVENTS_QUEUE_URL                  = module.messaging.queues["catalog-events"].url
       INVENTORY_BASE_URL                        = "http://inventory.${aws_service_discovery_private_dns_namespace.this.name}:8080"
-      CATALOG_BASE_URL                          = "http://catalog.${aws_service_discovery_private_dns_namespace.this.name}:8080"
       AUTH_MODE                                 = "trusted-gateway"
       SERVER_PORT                               = "8080"
-      RESERVATION_MAX_SECONDS                   = "600"
-      SQS_CONCURRENCY                           = "16"
-      SQS_WAIT_TIME_SECONDS                     = "20"
-      SQS_VISIBILITY_TIMEOUT_SECONDS            = "60"
-      OUTBOX_POLL_INTERVAL_MS                   = "500"
-      RECONCILIATION_INTERVAL_MS                = "5000"
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE = "health,info"
       MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED = "true"
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS   = "never"
       LOGGING_STRUCTURED_FORMAT_CONSOLE         = "ecs"
       JAVA_TOOL_OPTIONS                         = "-XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/tmp"
-    }
+      }, service == "inventory" ? {} : { OUTBOX_POLL_INTERVAL_MS = "500" },
+      service == "orders" ? { RECONCILIATION_INTERVAL_MS = "5000" } : {}
+    )
   }
   app_configuration = {
     for name, workload in local.workloads : name => merge(local.base_app_configuration[workload.context], {
