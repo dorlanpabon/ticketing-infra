@@ -73,6 +73,15 @@ class AuditTests(unittest.TestCase):
         path.write_text('variable "value" { default = 2 }\n')
         self.assertEqual(before, VERIFY.policy_hash(self.repo))
 
+    def test_policy_fingerprint_is_portable_across_git_line_endings(self):
+        path = self.repo / ".checkov.yml"
+        path.write_bytes(b"framework:\n  - terraform\n")
+        expected = VERIFY.policy_hash(self.repo)
+        path.write_bytes(b"framework:\r\n  - terraform\r\n")
+        self.assertEqual(expected, VERIFY.policy_hash(self.repo))
+        path.write_bytes(b"framework:\r\n  - github_actions\r\n")
+        self.assertNotEqual(expected, VERIFY.policy_hash(self.repo))
+
 
 if __name__ == "__main__":
     unittest.main()
