@@ -63,9 +63,10 @@ resource "aws_iam_role_policy" "task" {
   role = aws_iam_role.task.id
   policy = jsonencode({ Version = "2012-10-17", Statement = concat([
     { Sid = "OwnTable", Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:ConditionCheckItem", "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem", "dynamodb:Query", "dynamodb:DescribeTable"], Resource = [var.table_arn, "${var.table_arn}/index/*"] },
-    { Sid = "EncryptedData", Effect = "Allow", Action = ["kms:Decrypt", "kms:GenerateDataKey"], Resource = var.kms_key_arn, Condition = { StringEquals = { "kms:ViaService" = var.workload_role == "worker" ? ["sqs.${var.region}.amazonaws.com", "dynamodb.${var.region}.amazonaws.com"] : ["dynamodb.${var.region}.amazonaws.com"] } } }
+    { Sid = "EncryptedData", Effect = "Allow", Action = ["kms:Decrypt", "kms:GenerateDataKey"], Resource = var.kms_key_arn, Condition = { StringEquals = { "kms:ViaService" = var.workload_role == "worker" || length(var.publish_queue_arns) > 0 ? ["sqs.${var.region}.amazonaws.com", "dynamodb.${var.region}.amazonaws.com"] : ["dynamodb.${var.region}.amazonaws.com"] } } }
     ], var.workload_role == "worker" ? [
-    { Sid = "ConsumeOwnQueues", Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes"], Resource = var.consume_queue_arns },
+    { Sid = "ConsumeOwnQueues", Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes"], Resource = var.consume_queue_arns }
+    ] : [], length(var.publish_queue_arns) > 0 ? [
     { Sid = "PublishDomainMessages", Effect = "Allow", Action = ["sqs:SendMessage"], Resource = var.publish_queue_arns }
   ] : []) })
 }

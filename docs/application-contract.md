@@ -52,7 +52,7 @@ Cognito usa alta administrativa, password fuerte, MFA TOTP y Authorization Code 
 
 ## Telemetría
 
-API y worker escriben logs separados por contexto/rol. Solo los workers tienen permisos de consumir/publicar SQS; las APIs guardan intenciones en el outbox de su tabla y no ejecutan polling ni tareas periódicas.
+API y worker escriben logs separados por contexto y rol. Los workers consumen sus colas y procesan el outbox en segundo plano. Orders API puede enviar a `inventory-commands` después de guardar la intención en su outbox y espera la confirmación de SQS antes de responder `202`.
 
 CloudWatch recibe stdout estructurado. Los filtros de métricas de negocio se aplican a los logs de workers y esperan registros JSON de la forma `{"metric":"outbox_age_seconds","value":1.5}` en cada servicio y `{"metric":"expiration_lag_seconds","value":0.4}` en Inventory.
 
