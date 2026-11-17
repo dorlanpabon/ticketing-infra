@@ -2,21 +2,43 @@
 
 Desde la raíz de `ticketing-infra`, usa Terraform 1.17.2, el proveedor AWS fijado en los archivos de bloqueo y Python 3. La primera inicialización necesita acceso al registro del proveedor o a un espejo configurado. Estas pruebas usan `mock_provider` y `command = plan`, con el backend remoto desactivado.
 
-```powershell
-terraform fmt -check -recursive infra
-if ($LASTEXITCODE -ne 0) { throw 'Hay archivos Terraform sin formato' }
-python scripts/test_verify.py
-if ($LASTEXITCODE -ne 0) { throw 'Falló la auditoría Git' }
+Ejecuta los comandos en Bash, en el orden indicado. Si alguno falla, corrige el error antes de continuar.
 
-$raices = 'infra/bootstrap', 'infra/envs/dev', 'infra/envs/qa', 'infra/envs/prod'
-foreach ($raiz in $raices) {
-    terraform "-chdir=$raiz" init -backend=false -input=false -lockfile=readonly
-    if ($LASTEXITCODE -ne 0) { throw "Falló init en $raiz" }
-    terraform "-chdir=$raiz" validate
-    if ($LASTEXITCODE -ne 0) { throw "Falló validate en $raiz" }
-    terraform "-chdir=$raiz" test
-    if ($LASTEXITCODE -ne 0) { throw "Falló test en $raiz" }
-}
+```bash
+terraform fmt -check -recursive infra
+python3 scripts/test_verify.py
+```
+
+### Bootstrap
+
+```bash
+terraform -chdir=infra/bootstrap init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra/bootstrap validate
+terraform -chdir=infra/bootstrap test
+```
+
+### DEV
+
+```bash
+terraform -chdir=infra/envs/dev init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra/envs/dev validate
+terraform -chdir=infra/envs/dev test
+```
+
+### QA
+
+```bash
+terraform -chdir=infra/envs/qa init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra/envs/qa validate
+terraform -chdir=infra/envs/qa test
+```
+
+### PROD
+
+```bash
+terraform -chdir=infra/envs/prod init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra/envs/prod validate
+terraform -chdir=infra/envs/prod test
 ```
 
 ## Evidencia registrada

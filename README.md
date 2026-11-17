@@ -30,7 +30,9 @@ La [guía de verificación](docs/verificacion.md) contiene los comandos de Terra
 
 ## Arquitectura
 
-La [guía de infraestructura](docs/infraestructura.md) explica la red, IAM, el escalado y los costos. Abre el [diagrama con iconos de AWS](docs/diagramas/infraestructura-aws.drawio) mediante **Archivo → Abrir desde → Dispositivo** en [diagrams.net](https://app.diagrams.net/).
+![Red y ejecución en AWS. API Gateway valida los tokens de Cognito y enruta por el ALB interno a las tareas ECS Fargate en subredes privadas.](docs/diagramas/red-y-ejecucion.png)
+
+La [guía de infraestructura](docs/infraestructura.md) explica la red, IAM, el escalado y los costos. El [archivo editable](docs/diagramas/infraestructura-aws.drawio) incluye las tres vistas y se abre en [diagrams.net](https://app.diagrams.net/).
 
 ## Decisiones y compromisos
 
