@@ -1,6 +1,7 @@
 name: Infrastructure quality per commit
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [develop, release, main]
   push:
@@ -39,7 +40,7 @@ jobs:
           python .trusted/scripts/test_verify.py
       - name: Verify every introduced commit and integration result
         env:
-          BEFORE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BEFORE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           AFTER: ${{ github.event.pull_request.head.sha || github.sha }}
           INTEGRATION: ${{ github.sha }}
           APPROVED_POLICY_HASH: ${{ vars.APPROVED_POLICY_HASH }}

@@ -41,6 +41,8 @@ terraform -chdir=infra/envs/prod validate
 terraform -chdir=infra/envs/prod test
 ```
 
+Con la política de confianza configurada, `gh workflow run infra-ci.yml --ref main` verifica el commit seleccionado mediante GitHub Actions.
+
 ## Evidencia registrada
 
 El 16 de noviembre de 2026, un clon limpio de `develop` en `80d0252f3989e282b48c5f722e152929e1ae19c8` pasó `init`, `validate` y **14 pruebas simuladas de Terraform** con el proveedor AWS 6.73.0. Pasaron dos en `bootstrap`, cuatro en DEV, cuatro en QA y cuatro en PROD. La auditoría Git pasó **7 pruebas de Python**.
