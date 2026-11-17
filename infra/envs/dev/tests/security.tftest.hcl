@@ -90,8 +90,20 @@ run "isolated_dev_plan" {
     error_message = "Three domain images must produce six independently scalable workloads without rebuilding worker images."
   }
   assert {
-    condition     = alltrue([for workload in values(module.platform.verification_contract.services) : workload.role == "api" ? (workload.load_balancers == 1 && workload.dns_registrations == 1 && workload.cpu_policies == 1 && workload.queue_policies == 0 && !strcontains(jsonencode(workload.task_permissions), "sqs:")) : (workload.load_balancers == 0 && workload.dns_registrations == 0 && workload.cpu_policies == 0 && workload.queue_policies == 2 && strcontains(jsonencode(workload.task_permissions), "sqs:ReceiveMessage") && strcontains(jsonencode(workload.task_permissions), "sqs:SendMessage"))])
-    error_message = "Only APIs may register with ALB/DNS; only workers may access SQS and scale on queue backlog."
+    condition     = alltrue([for name, workload in module.platform.verification_contract.services : workload.role == "api" ? (workload.load_balancers == 1 && workload.dns_registrations == 1 && workload.cpu_policies == 1 && workload.queue_policies == 0 && (name == "orders-api" || !strcontains(jsonencode(workload.task_permissions), "sqs:"))) : (workload.load_balancers == 0 && workload.dns_registrations == 0 && workload.cpu_policies == 0 && workload.queue_policies == 2 && strcontains(jsonencode(workload.task_permissions), "sqs:ReceiveMessage") && strcontains(jsonencode(workload.task_permissions), "sqs:SendMessage"))])
+    error_message = "APIs register with ALB/DNS and workers consume and scale on their own queues."
+  }
+
+  assert {
+    condition = (
+      length([for statement in module.platform.verification_contract.services["orders-api"].task_permissions.Statement : statement if anytrue([for action in statement.Action : startswith(action, "sqs:")])]) == 1 &&
+      alltrue([
+        for statement in module.platform.verification_contract.services["orders-api"].task_permissions.Statement :
+        statement.Action == ["sqs:SendMessage"] && statement.Resource == [module.platform.queues["inventory-commands"].arn]
+        if anytrue([for action in statement.Action : startswith(action, "sqs:")])
+      ])
+    )
+    error_message = "Orders API can only send messages to the inventory commands queue."
   }
   assert {
     condition     = alltrue([for workload in values(module.platform.verification_contract.services) : ({ for entry in workload.container.environment : entry.name => entry.value }).API_ENABLED == tostring(workload.role == "api") && ({ for entry in workload.container.environment : entry.name => entry.value }).WORKERS_ENABLED == tostring(workload.role == "worker")])

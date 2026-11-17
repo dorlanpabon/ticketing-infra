@@ -130,7 +130,7 @@ module "service" {
   table_arn           = module.data.tables[each.value.context].arn
   consume_queue_arns  = [for queue in local.consume[each.value.context] : module.messaging.queues[queue].arn]
   consume_queue_names = [for queue in local.consume[each.value.context] : module.messaging.queues[queue].name]
-  publish_queue_arns  = [for queue in local.publish[each.value.context] : module.messaging.queues[queue].arn]
+  publish_queue_arns  = [for queue in local.publish[each.value.context] : module.messaging.queues[queue].arn if each.value.role == "worker" || each.value.context == "orders"]
   kms_key_arn         = aws_kms_key.this.arn
   log_retention_days  = local.policy.retention
   min_capacity        = local.policy.minimum
